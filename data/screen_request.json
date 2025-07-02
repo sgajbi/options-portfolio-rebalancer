@@ -1,0 +1,23 @@
+{
+  "client_id": "ABC123",
+  "investment_horizon_years": 3,
+  "risk_profile": "Moderate",
+  "product_knowledge": ["Equity", "Basic Options"],
+  "positions": [
+    {
+      "type": "Equity",
+      "symbol": "AAPL",
+      "quantity": 1000,
+      "cio_rating": "Hold"
+    },
+    {
+      "type": "Option",
+      "symbol": "AAPL",
+      "option_type": "Call",
+      "strike": 150,
+      "expiry": "2026-01-17",
+      "position": "Short",
+      "contracts": 1
+    }
+  ]
+}
