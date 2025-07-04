@@ -202,13 +202,15 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
         coverage: float = 0.0
 
         if position_type == "Short" and option_type == "Call":
-            if equity_exposure > 0:
-                coverage = min(100.0, round((option_exposure / equity_exposure) * 100, 2))
+            if equity_exposure > 0 and option_exposure > 0:
+                coverage = min(100.0, round((equity_exposure / option_exposure) * 100, 2))
                 tag = "Covered Call"
+            # If no equity, it remains "Naked" as initialized.
         elif position_type == "Long" and option_type == "Put":
-            if equity_exposure > 0:
-                coverage = min(100.0, round((option_exposure / equity_exposure) * 100, 2))
+            if equity_exposure > 0 and option_exposure > 0:
+                coverage = min(100.0, round((equity_exposure / option_exposure) * 100, 2))
                 tag = "Protective Put"
+            # If no equity, it remains "Naked" as initialized.
 
         results.append(
             TaggedOptionPosition(
