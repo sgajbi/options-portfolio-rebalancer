@@ -1,14 +1,19 @@
 {
-  "client_id": "ABC123",
+  "portfolio_id": "ABC123",
   "investment_horizon_years": 3,
   "risk_profile": "Moderate",
+  "portfolio_currency": "USD",
   "product_knowledge": ["Equity", "Basic Options"],
   "positions": [
     {
       "type": "Equity",
       "symbol": "AAPL",
       "quantity": 1000,
-      "cio_rating": "Hold"
+      "cio_rating": "Hold",
+      "average_cost_price": 150.0,
+      "instrument_currency": "USD",
+      "market_value": 170000.0,
+      "isin": "US0378331005"
     },
     {
       "type": "Option",
@@ -17,7 +22,12 @@
       "strike": 150,
       "expiry": "2026-01-17",
       "position": "Short",
-      "contracts": 1
+      "contracts": 1,
+      "price_at_purchase": 5.0,
+      "current_price": 7.0,
+      "market_value": 700.0,
+      "isin": "US0378331005",
+      "instrument_currency": "USD"
     }
   ]
 }
