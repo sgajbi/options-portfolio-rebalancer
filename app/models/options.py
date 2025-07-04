@@ -10,5 +10,15 @@ class TaggedOptionPosition(BaseModel):
     position: Literal["Long", "Short"] = Field(json_schema_extra={"description": "Position type: Long (buyer) or Short (writer)."})
     strike: float = Field(json_schema_extra={"description": "Strike price of the option."})
     expiry: str = Field(json_schema_extra={"description": "Expiration date of the option in ISO format (YYYY-MM-DD)."})
-    tag: Literal["Naked", "Covered Call", "Protective Put"] = Field(json_schema_extra={"description": "Identified option strategy tag."})
+    tag: Literal[
+        "Naked", 
+        "Covered Call", 
+        "Protective Put",
+        "Long Straddle", # Added
+        "Short Straddle", # Added
+        "Long Strangle", # Added
+        "Short Strangle", # Added
+        "Call Vertical Spread", # Added
+        "Put Vertical Spread" # Added
+    ] = Field(json_schema_extra={"description": "Identified option strategy tag."})
     coverage_percent: float = Field(ge=0.0, le=100.0, json_schema_extra={"description": "Percentage of the option's notional covered by underlying equity. 0 for naked, 100 for fully covered."})
