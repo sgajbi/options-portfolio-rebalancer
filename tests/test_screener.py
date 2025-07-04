@@ -1,6 +1,7 @@
 import pytest
 from app.models.portfolio import Portfolio, EquityPosition, OptionPosition
 from app.services.screener import tag_option_strategies
+from app.models.options import TaggedOptionPosition # Import new model
 
 def test_tag_covered_call():
     """
@@ -44,11 +45,13 @@ def test_tag_covered_call():
     results = tag_option_strategies(portfolio)
 
     assert len(results) == 1
-    assert results[0]["symbol"] == "AAPL"
-    assert results[0]["option_type"] == "Call"
-    assert results[0]["position"] == "Short"
-    assert results[0]["tag"] == "Covered Call"
-    assert results[0]["coverage_percent"] == 50.0 # 500 shares / 1000 shares equity = 50%
+    result = results[0]
+    assert isinstance(result, TaggedOptionPosition) # Assert return type
+    assert result.symbol == "AAPL"
+    assert result.option_type == "Call"
+    assert result.position == "Short"
+    assert result.tag == "Covered Call"
+    assert result.coverage_percent == 50.0 # 500 shares / 1000 shares equity = 50%
 
 def test_tag_protective_put():
     """
@@ -92,8 +95,10 @@ def test_tag_protective_put():
     results = tag_option_strategies(portfolio)
 
     assert len(results) == 1
-    assert results[0]["symbol"] == "GOOG"
-    assert results[0]["option_type"] == "Put"
-    assert results[0]["position"] == "Long"
-    assert results[0]["tag"] == "Protective Put"
-    assert results[0]["coverage_percent"] == 50.0 # 100 shares / 200 shares equity = 50%
+    result = results[0]
+    assert isinstance(result, TaggedOptionPosition) # Assert return type
+    assert result.symbol == "GOOG"
+    assert result.option_type == "Put"
+    assert result.position == "Long"
+    assert result.tag == "Protective Put"
+    assert result.coverage_percent == 50.0 # 100 shares / 200 shares equity = 50%
