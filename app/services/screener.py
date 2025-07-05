@@ -5,6 +5,8 @@ from ..models.equity_position import EquityPosition
 from ..models.options import TaggedOptionPosition
 from ..models.option_position import OptionPosition
 
+OPTION_MULTIPLIER = 100
+
 
 def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     """
@@ -32,14 +34,14 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     
     # Keep track of options that have been tagged as part of a multi-leg strategy
     # to avoid double-tagging them as 'Naked' or other single-leg strategies.
-    processed_option_ids = set() 
+    processed_option_ids = set()
 
     # --- Strategy Identification Logic ---
 
     # 1. Identify Straddles (Long or Short)
     # A straddle involves buying/selling both a call and a put with the same strike and expiry on the same underlying.
     for symbol, expiries in options_by_symbol_expiry.items():
-        for expiry, options_list_for_expiry in expiries.items(): # Renamed to avoid confusion
+        for expiry, options_list_for_expiry in expiries.items():
             calls = [op for op in options_list_for_expiry if op.option_type == "Call" and op.isin not in processed_option_ids]
             puts = [op for op in options_list_for_expiry if op.option_type == "Put" and op.isin not in processed_option_ids]
             
@@ -99,9 +101,9 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
             for call in calls:
                 for put in puts:
                     # Check for different strikes, same position (both long or both short), and call strike > put strike
-                    if (call.strike > put.strike and 
-                        call.position == put.position and 
-                        call.isin not in processed_option_ids and 
+                    if (call.strike > put.strike and
+                        call.position == put.position and
+                        call.isin not in processed_option_ids and
                         put.isin not in processed_option_ids):
                         matched_strangles.append((call, put))
                         
@@ -198,7 +200,7 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
         strike = pos.strike
         expiry = pos.expiry
 
-        option_exposure = contracts * 100
+        option_exposure = contracts * OPTION_MULTIPLIER # Use the new constant
         equity_exposure = equity_map.get(symbol, 0)
 
         tag: str = "Naked" # Default to Naked
@@ -207,13 +209,18 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
         if position_type == "Short" and option_type == "Call":
             if equity_exposure > 0 and option_exposure > 0:
                 coverage = min(100.0, round((equity_exposure / option_exposure) * 100, 2))
-                tag = "Covered Call"
             # If no equity, it remains "Naked" as initialized.
         elif position_type == "Long" and option_type == "Put":
             if equity_exposure > 0 and option_exposure > 0:
                 coverage = min(100.0, round((equity_exposure / option_exposure) * 100, 2))
-                tag = "Protective Put"
             # If no equity, it remains "Naked" as initialized.
+        
+        # Apply the tag only if coverage is determined, otherwise keep default 'Naked'
+        if coverage >= 100.0 and position_type == "Short" and option_type == "Call":
+            tag = "Covered Call"
+        elif coverage >= 100.0 and position_type == "Long" and option_type == "Put":
+            tag = "Protective Put"
+
 
         results.append(
             TaggedOptionPosition(
