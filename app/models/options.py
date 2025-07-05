@@ -11,11 +11,13 @@ class TaggedOptionPosition(BaseModel):
     option_type: Literal["Call", "Put"] = Field(json_schema_extra={"description": "Type of the option: Call or Put."})
     position: Literal["Long", "Short"] = Field(json_schema_extra={"description": "Position type: Long (buyer) or Short (writer)."})
     strike: float = Field(json_schema_extra={"description": "Strike price of the option."})
-    expiry: date = Field(json_schema_extra={"description": "Expiration date of the option in ISO format (YYYY-MM-DD)."}) # Changed to date
+    expiry: date = Field(json_schema_extra={"description": "Expiration date of the option in ISO format (YYYY-MM-DD)."}) # Already correctly set to date
     tag: Literal[
         "Naked", 
         "Covered Call", 
         "Protective Put",
+        "Partially Covered Call", 
+        "Partially Protective Put", 
         "Long Straddle", 
         "Short Straddle", 
         "Long Strangle",

@@ -31,7 +31,7 @@ class OptionPosition(BaseModel):
         ge=0
     )
 
-    expiry: date = Field(
+    expiry: date = Field( 
         json_schema_extra={
             "description": "Expiration date of the option (ISO 8601 format).",
             "example": "2025-12-19"
