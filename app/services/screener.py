@@ -200,28 +200,22 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
         strike = pos.strike
         expiry = pos.expiry
 
-        option_exposure = contracts * OPTION_MULTIPLIER # Use the new constant
-        equity_exposure = equity_map.get(symbol, 0)
+        option_exposure_shares = contracts * OPTION_MULTIPLIER
+        equity_held_shares = equity_map.get(symbol, 0)
 
         tag: str = "Naked" # Default to Naked
         coverage: float = 0.0
 
-        if position_type == "Short" and option_type == "Call":
-            if equity_exposure > 0 and option_exposure > 0:
-                coverage = min(100.0, round((equity_exposure / option_exposure) * 100, 2))
-            # If no equity, it remains "Naked" as initialized.
-        elif position_type == "Long" and option_type == "Put":
-            if equity_exposure > 0 and option_exposure > 0:
-                coverage = min(100.0, round((equity_exposure / option_exposure) * 100, 2))
-            # If no equity, it remains "Naked" as initialized.
+        if option_exposure_shares > 0: # Avoid division by zero
+            if position_type == "Short" and option_type == "Call":
+                coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
+                if coverage > 0: # If there's any coverage, it's not truly naked
+                    tag = "Covered Call"
+            elif position_type == "Long" and option_type == "Put":
+                coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
+                if coverage > 0: # If there's any coverage, it's not truly naked
+                    tag = "Protective Put"
         
-        # Apply the tag only if coverage is determined, otherwise keep default 'Naked'
-        if coverage >= 100.0 and position_type == "Short" and option_type == "Call":
-            tag = "Covered Call"
-        elif coverage >= 100.0 and position_type == "Long" and option_type == "Put":
-            tag = "Protective Put"
-
-
         results.append(
             TaggedOptionPosition(
                 symbol=symbol,
