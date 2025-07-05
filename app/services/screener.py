@@ -1,7 +1,10 @@
 from typing import List, Dict
 from collections import defaultdict
-from ..models.portfolio import Portfolio, EquityPosition, OptionPosition
+from ..models.portfolio import Portfolio
+from ..models.equity_position import EquityPosition
 from ..models.options import TaggedOptionPosition
+from ..models.option_position import OptionPosition
+
 
 def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     """

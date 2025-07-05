@@ -14,11 +14,11 @@ class TaggedOptionPosition(BaseModel):
         "Naked", 
         "Covered Call", 
         "Protective Put",
-        "Long Straddle", # Added
-        "Short Straddle", # Added
-        "Long Strangle", # Added
-        "Short Strangle", # Added
-        "Call Vertical Spread", # Added
-        "Put Vertical Spread" # Added
+        "Long Straddle", 
+        "Short Straddle", 
+        "Long Strangle",
+        "Short Strangle", 
+        "Call Vertical Spread", 
+        "Put Vertical Spread" 
     ] = Field(json_schema_extra={"description": "Identified option strategy tag."})
     coverage_percent: float = Field(ge=0.0, le=100.0, json_schema_extra={"description": "Percentage of the option's notional covered by underlying equity. 0 for naked, 100 for fully covered."})

@@ -1,5 +1,7 @@
 import pytest
-from app.models.portfolio import Portfolio, EquityPosition, OptionPosition
+from app.models.portfolio import Portfolio 
+from app.models.option_position import OptionPosition
+from app.models.equity_position import EquityPosition
 from app.services.screener import tag_option_strategies
 from app.models.options import TaggedOptionPosition
 from datetime import datetime, timedelta
