@@ -1,121 +1,115 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 from collections import defaultdict
 from ..models.portfolio import Portfolio
 from ..models.equity_position import EquityPosition
 from ..models.options import TaggedOptionPosition
 from ..models.option_position import OptionPosition
-from datetime import date # Add this import for type hinting and clarity
+from ..models.option_strategy import OptionStrategy 
+import uuid 
 
 OPTION_MULTIPLIER = 100
+
+def _calculate_net_premium(options: List[OptionPosition]) -> float:
+    """Calculates the net premium paid/received for a list of option positions."""
+    net_premium = 0.0
+    for op in options:
+        transaction_value = op.price_at_purchase * op.contracts * OPTION_MULTIPLIER
+        if op.position == "Long":
+            net_premium += transaction_value
+        else: 
+            net_premium -= transaction_value
+    return net_premium
 
 def _identify_straddles(
     options_list: List[OptionPosition],
     processed_option_ids: set
-) -> List[TaggedOptionPosition]:
+) -> List[OptionStrategy]: 
     """
     Identifies Straddle strategies within a list of options.
     A straddle involves buying/selling both a call and a put with the same strike and expiry on the same underlying.
     """
-    results: List[TaggedOptionPosition] = []
-
+    results: List[OptionStrategy] = [] 
+    
     calls = [op for op in options_list if op.option_type == "Call" and op.isin not in processed_option_ids]
     puts = [op for op in options_list if op.option_type == "Put" and op.isin not in processed_option_ids]
-
+    
+    # Sorting is not strictly necessary for correctness here, but can help with consistency if processing order matters for ISINs
     calls.sort(key=lambda x: x.strike)
     puts.sort(key=lambda x: x.strike)
 
     matched_straddles = []
     for call in calls:
         for put in puts:
-            # Added expiry and symbol check for robust identification
-            if (call.strike == put.strike and
-                call.position == put.position and
-                call.expiry == put.expiry and
-                call.symbol == put.symbol): 
+            if (call.symbol == put.symbol and 
+                call.expiry == put.expiry and 
+                call.strike == put.strike and
+                call.position == put.position):
+                
                 if call.isin not in processed_option_ids and put.isin not in processed_option_ids:
                     matched_straddles.append((call, put))
-
+    
     for call, put in matched_straddles:
-        tag_name = f"{call.position} Straddle"
+        strategy_name = f"{call.position} Straddle"
+        
+        strategy_id = str(uuid.uuid4())
+
         results.append(
-            TaggedOptionPosition(
-                symbol=call.symbol,
-                option_type=call.option_type,
-                position=call.position,
-                strike=call.strike,
-                expiry=call.expiry,
-                tag=tag_name,
-                coverage_percent=0.0
-            )
-        )
-        results.append(
-            TaggedOptionPosition(
-                symbol=put.symbol,
-                option_type=put.option_type,
-                position=put.position,
-                strike=put.strike,
-                expiry=put.expiry,
-                tag=tag_name,
-                coverage_percent=0.0
+            OptionStrategy(
+                strategy_id=strategy_id,
+                strategy_name=strategy_name,
+                underlying_symbol=call.symbol,
+                expiry_date=call.expiry,
+                legs=[call, put],
+                net_premium_paid_received=_calculate_net_premium([call, put])
             )
         )
         processed_option_ids.add(call.isin)
         processed_option_ids.add(put.isin)
-
+            
     return results
 
 def _identify_strangles(
     options_list: List[OptionPosition],
     processed_option_ids: set
-) -> List[TaggedOptionPosition]:
+) -> List[OptionStrategy]: 
     """
     Identifies Strangle strategies within a list of options.
     A strangle involves buying/selling both a call and a put with different strikes
     but same expiry on the same underlying, where the call strike is higher than the put strike.
     """
-    results: List[TaggedOptionPosition] = []
+    results: List[OptionStrategy] = [] 
 
     calls = [op for op in options_list if op.option_type == "Call" and op.isin not in processed_option_ids]
     puts = [op for op in options_list if op.option_type == "Put" and op.isin not in processed_option_ids]
-
+    
     calls.sort(key=lambda x: x.strike)
     puts.sort(key=lambda x: x.strike)
 
     matched_strangles = []
     for call in calls:
         for put in puts:
-            # Check for different strikes, same position (both long or both short),
-            # and call strike > put strike, same expiry, same symbol
-            if (call.strike > put.strike and
-                call.position == put.position and
-                call.expiry == put.expiry and # Added expiry check
-                call.symbol == put.symbol and # Added symbol check
-                call.isin not in processed_option_ids and
-                put.isin not in processed_option_ids):
-                matched_strangles.append((call, put))
+            # Check for same underlying, same expiry, different strikes, same position (both long or both short), and call strike > put strike
+            if (call.symbol == put.symbol and 
+                call.expiry == put.expiry and 
+                call.strike > put.strike and
+                call.position == put.position):
+                
 
+                if call.isin not in processed_option_ids and put.isin not in processed_option_ids:
+                    matched_strangles.append((call, put))
+                
     for call, put in matched_strangles:
-        tag_name = f"{call.position} Strangle"
+        strategy_name = f"{call.position} Strangle"
+        strategy_id = str(uuid.uuid4()) 
+
         results.append(
-            TaggedOptionPosition(
-                symbol=call.symbol,
-                option_type=call.option_type,
-                position=call.position,
-                strike=call.strike,
-                expiry=call.expiry,
-                tag=tag_name,
-                coverage_percent=0.0
-            )
-        )
-        results.append(
-            TaggedOptionPosition(
-                symbol=put.symbol,
-                option_type=put.option_type,
-                position=put.position,
-                strike=put.strike,
-                expiry=put.expiry,
-                tag=tag_name,
-                coverage_percent=0.0
+            OptionStrategy(
+                strategy_id=strategy_id,
+                strategy_name=strategy_name,
+                underlying_symbol=call.symbol,
+                expiry_date=call.expiry,
+                legs=[call, put],
+                net_premium_paid_received=_calculate_net_premium([call, put])
             )
         )
         processed_option_ids.add(call.isin)
@@ -126,12 +120,12 @@ def _identify_strangles(
 def _identify_vertical_spreads(
     options_list: List[OptionPosition],
     processed_option_ids: set
-) -> List[TaggedOptionPosition]:
+) -> List[OptionStrategy]:
     """
     Identifies Vertical Spread strategies within a list of options.
     Looks for two options of the same type and same expiry, but different strikes and opposite positions.
     """
-    results: List[TaggedOptionPosition] = []
+    results: List[OptionStrategy] = [] # Changed to OptionStrategy
 
     remaining_options_for_spread = [op for op in options_list if op.isin not in processed_option_ids]
     remaining_options_for_spread.sort(key=lambda x: x.strike)
@@ -142,45 +136,36 @@ def _identify_vertical_spreads(
             option1 = remaining_options_for_spread[i]
             option2 = remaining_options_for_spread[j]
 
-            # Ensure they are on the same underlying symbol and have the same expiry
             if (option1.symbol == option2.symbol and
-                option1.expiry == option2.expiry and # Added expiry check
-                option1.option_type == option2.option_type and
-                option1.strike != option2.strike): # Strikes must be different for a spread
-
+                option1.expiry == option2.expiry and
+                option1.option_type == option2.option_type and 
+                option1.strike != option2.strike): 
+                
+                # Opposite positions (Long and Short)
                 if (option1.position == "Long" and option2.position == "Short") or \
                    (option1.position == "Short" and option2.position == "Long"):
-
+                    
+                    # Ensure options haven't been processed yet
                     if option1.isin not in processed_option_ids and option2.isin not in processed_option_ids:
                         matched_spreads.append((option1, option2))
-
+            
     for option1, option2 in matched_spreads:
-        tag_name = f"{option1.option_type} Vertical Spread" # Simplified naming
+        strategy_name = f"{option1.option_type} Vertical Spread" 
+        strategy_id = str(uuid.uuid4()) 
+
         results.append(
-            TaggedOptionPosition(
-                symbol=option1.symbol,
-                option_type=option1.option_type,
-                position=option1.position,
-                strike=option1.strike,
-                expiry=option1.expiry,
-                tag=tag_name,
-                coverage_percent=0.0
-            )
-        )
-        results.append(
-            TaggedOptionPosition(
-                symbol=option2.symbol,
-                option_type=option2.option_type,
-                position=option2.position,
-                strike=option2.strike,
-                expiry=option2.expiry,
-                tag=tag_name,
-                coverage_percent=0.0
+            OptionStrategy(
+                strategy_id=strategy_id,
+                strategy_name=strategy_name,
+                underlying_symbol=option1.symbol,
+                expiry_date=option1.expiry,
+                legs=[option1, option2],
+                net_premium_paid_received=_calculate_net_premium([option1, option2])
             )
         )
         processed_option_ids.add(option1.isin)
         processed_option_ids.add(option2.isin)
-
+    
     return results
 
 def _process_single_leg_options(
@@ -203,36 +188,32 @@ def _process_single_leg_options(
         strike = pos.strike
         expiry = pos.expiry
 
+        # Default tags for single-leg options that aren't part of multi-leg strategies
+        tag: Literal["Naked", "Covered Call", "Protective Put", "Partially Covered Call", "Partially Protective Put", "Long Call", "Short Put"] = "Naked"
+        coverage: float = 0.0
+
         option_exposure_shares = contracts * OPTION_MULTIPLIER
         equity_held_shares = equity_map.get(symbol, 0)
 
-        tag: str = "Naked" # Default to Naked
-        coverage: float = 0.0
-
+        # Logic for Covered Call and Protective Put
         if option_exposure_shares > 0: # Avoid division by zero
             if position_type == "Short" and option_type == "Call":
-                # A short call needs to be covered by equity
                 coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
-                if coverage >= 100.0: # Only fully covered calls are "Covered Call"
+                if coverage == 100.0:
                     tag = "Covered Call"
-                else: # Partially covered or not covered
-                    tag = "Naked" if coverage == 0.0 else "Partially Covered Call" # Introduce "Partially Covered Call"
+                elif coverage > 0:
+                    tag = "Partially Covered Call"
             elif position_type == "Long" and option_type == "Put":
-                # A long put protects an equity holding
                 coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
-                if coverage >= 100.0: # Only fully covered puts are "Protective Put"
+                if coverage == 100.0:
                     tag = "Protective Put"
-                else: # Partially covered or not covered
-                    tag = "Naked" if coverage == 0.0 else "Partially Protective Put" # Introduce "Partially Protective Put"
-            # For other cases (Long Call, Short Put), they are generally naked unless part of a spread/multi-leg.
-            # The default "Naked" tag will apply if no specific strategy is identified by multi-leg.
-            elif position_type == "Long" and option_type == "Call": # Explicitly tag long calls not part of spreads as naked
-                tag = "Naked" 
-            elif position_type == "Short" and option_type == "Put": # Explicitly tag short puts not part of spreads as naked
-                tag = "Naked" 
-        else: # If contracts is 0, it's not a valid option position for exposure calculations
-            tag = "Invalid Option Position" # Or handle as an error/skip
-
+                elif coverage > 0:
+                    tag = "Partially Protective Put"
+            elif position_type == "Long" and option_type == "Call":
+                tag = "Long Call" # Explicitly tag Long Calls not part of multi-leg
+            elif position_type == "Short" and option_type == "Put":
+                tag = "Short Put" # Explicitly tag Short Puts not part of multi-leg
+            
         results.append(
             TaggedOptionPosition(
                 symbol=symbol,
@@ -248,10 +229,12 @@ def _process_single_leg_options(
     return results
 
 
-def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
+def tag_option_strategies(portfolio: Portfolio) -> List[Union[TaggedOptionPosition, OptionStrategy]]: # Changed return type
     """
     Analyzes option positions within a portfolio to identify and tag common strategies
     like Covered Calls, Protective Puts, Straddles, Strangles, and Spreads.
+    Returns a list of identified OptionStrategy objects for multi-leg strategies
+    and TaggedOptionPosition objects for single-leg options.
     """
     equity_map = {
         p.symbol: p.quantity
@@ -260,51 +243,42 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     }
 
     # Group options by symbol and then by expiry for easier identification of multi-leg strategies
-    # Changed type hint for inner dictionary key from str to date
-    options_by_symbol_expiry: Dict[str, Dict[date, List[OptionPosition]]] = defaultdict(lambda: defaultdict(list)) 
-
+    options_by_symbol_expiry: Dict[str, Dict[date, List[OptionPosition]]] = defaultdict(lambda: defaultdict(list))
+    
     # Store all options in a flat list to keep track of already processed options
     all_options_list: List[OptionPosition] = []
 
     for pos in portfolio.positions:
         if isinstance(pos, OptionPosition):
+            # Ensure expiry is a date object for consistent keying
+            if isinstance(pos.expiry, str):
+                pos.expiry = datetime.strptime(pos.expiry, "%Y-%m-%d").date()
             options_by_symbol_expiry[pos.symbol][pos.expiry].append(pos)
             all_options_list.append(pos)
 
-    results: List[TaggedOptionPosition] = []
-
+    results: List[Union[TaggedOptionPosition, OptionStrategy]] = [] # Changed results list type
+    
     # Keep track of options that have been tagged as part of a multi-leg strategy
     # to avoid double-tagging them as 'Naked' or other single-leg strategies.
     processed_option_ids = set()
 
     # --- Strategy Identification Logic ---
-    # Process multi-leg strategies first as they take precedence
-
-    # Iterate through a copy of keys to allow modification of options_by_symbol_expiry if needed,
-    # though processed_option_ids is the primary mechanism for avoiding re-processing.
-
-    # 1. Identify Straddles (Long or Short)
+    # These functions now return OptionStrategy objects directly
     for symbol, expiries in options_by_symbol_expiry.items():
-        # Iterate over items to get both expiry date and list of options
-        for expiry_date, options_list_for_expiry in expiries.items(): # Changed expiry to expiry_date for clarity
-            straddle_results = _identify_straddles(options_list_for_expiry, processed_option_ids)
-            results.extend(straddle_results)
+        for expiry, options_list_for_expiry in expiries.items():
+            # Identify Straddles
+            straddle_strategies = _identify_straddles(options_list_for_expiry, processed_option_ids)
+            results.extend(straddle_strategies)
 
-    # 2. Identify Strangles (Long or Short)
-    for symbol, expiries in options_by_symbol_expiry.items():
-        for expiry_date, options_list_for_expiry in expiries.items(): # Changed expiry to expiry_date for clarity
-            strangle_results = _identify_strangles(options_list_for_expiry, processed_option_ids)
-            results.extend(strangle_results)
+            # Identify Strangles (pass a fresh list of options for the current symbol/expiry that haven't been processed)
+            strangle_strategies = _identify_strangles(options_list_for_expiry, processed_option_ids)
+            results.extend(strangle_strategies)
 
-    # 3. Identify Spreads (Vertical)
-    for symbol, expiries in options_by_symbol_expiry.items():
-        for expiry_date, options_list_for_expiry in expiries.items(): # Changed expiry to expiry_date for clarity
-            spread_results = _identify_vertical_spreads(options_list_for_expiry, processed_option_ids)
-            results.extend(spread_results)
-
-    # 4. Process remaining single-leg options (Covered Call, Protective Put, Naked)
-    # This must be done *after* all multi-leg strategies have been identified
-    # because options part of multi-leg strategies should not be tagged as single-leg.
+            # Identify Spreads
+            spread_strategies = _identify_vertical_spreads(options_list_for_expiry, processed_option_ids)
+            results.extend(spread_strategies)
+    
+    # 4. Process remaining single-leg options (Covered Call, Protective Put, Naked, Long Call, Short Put)
     single_leg_results = _process_single_leg_options(all_options_list, processed_option_ids, equity_map)
     results.extend(single_leg_results)
 
