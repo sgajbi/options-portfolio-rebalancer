@@ -5,10 +5,11 @@ from ..models.equity_position import EquityPosition
 from ..models.options import TaggedOptionPosition
 from ..models.option_position import OptionPosition
 
+# Define a constant for the option multiplier to improve readability
 OPTION_MULTIPLIER = 100
 
 def _identify_straddles(
-    options_list: List[OptionPosition], 
+    options_list: List[OptionPosition],
     processed_option_ids: set
 ) -> List[TaggedOptionPosition]:
     """
@@ -59,6 +60,62 @@ def _identify_straddles(
             
     return results
 
+def _identify_strangles(
+    options_list: List[OptionPosition],
+    processed_option_ids: set
+) -> List[TaggedOptionPosition]:
+    """
+    Identifies Strangle strategies within a list of options.
+    A strangle involves buying/selling both a call and a put with different strikes
+    but same expiry on the same underlying, where the call strike is higher than the put strike.
+    """
+    results: List[TaggedOptionPosition] = []
+
+    calls = [op for op in options_list if op.option_type == "Call" and op.isin not in processed_option_ids]
+    puts = [op for op in options_list if op.option_type == "Put" and op.isin not in processed_option_ids]
+    
+    calls.sort(key=lambda x: x.strike)
+    puts.sort(key=lambda x: x.strike)
+
+    matched_strangles = []
+    for call in calls:
+        for put in puts:
+            # Check for different strikes, same position (both long or both short), and call strike > put strike
+            if (call.strike > put.strike and
+                call.position == put.position and
+                call.isin not in processed_option_ids and
+                put.isin not in processed_option_ids):
+                matched_strangles.append((call, put))
+                
+    for call, put in matched_strangles:
+        tag_name = f"{call.position} Strangle"
+        results.append(
+            TaggedOptionPosition(
+                symbol=call.symbol,
+                option_type=call.option_type,
+                position=call.position,
+                strike=call.strike,
+                expiry=call.expiry,
+                tag=tag_name,
+                coverage_percent=0.0
+            )
+        )
+        results.append(
+            TaggedOptionPosition(
+                symbol=put.symbol,
+                option_type=put.option_type,
+                position=put.position,
+                strike=put.strike,
+                expiry=put.expiry,
+                tag=tag_name,
+                coverage_percent=0.0
+            )
+        )
+        processed_option_ids.add(call.isin)
+        processed_option_ids.add(put.isin)
+
+    return results
+
 
 def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     """
@@ -97,52 +154,10 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
             results.extend(straddle_results)
 
     # 2. Identify Strangles (Long or Short)
-    # A strangle involves buying/selling both a call and a put with different strikes but same expiry on the same underlying.
-    # The call strike is higher than the put strike.
     for symbol, expiries in options_by_symbol_expiry.items():
         for expiry, options_list_for_expiry in expiries.items():
-            calls = [op for op in options_list_for_expiry if op.option_type == "Call" and op.isin not in processed_option_ids]
-            puts = [op for op in options_list_for_expiry if op.option_type == "Put" and op.isin not in processed_option_ids]
-            
-            calls.sort(key=lambda x: x.strike)
-            puts.sort(key=lambda x: x.strike)
-
-            matched_strangles = []
-            for call in calls:
-                for put in puts:
-                    # Check for different strikes, same position (both long or both short), and call strike > put strike
-                    if (call.strike > put.strike and
-                        call.position == put.position and
-                        call.isin not in processed_option_ids and
-                        put.isin not in processed_option_ids):
-                        matched_strangles.append((call, put))
-                        
-            for call, put in matched_strangles:
-                tag_name = f"{call.position} Strangle"
-                results.append(
-                    TaggedOptionPosition(
-                        symbol=call.symbol,
-                        option_type=call.option_type,
-                        position=call.position,
-                        strike=call.strike,
-                        expiry=call.expiry,
-                        tag=tag_name,
-                        coverage_percent=0.0
-                    )
-                )
-                results.append(
-                    TaggedOptionPosition(
-                        symbol=put.symbol,
-                        option_type=put.option_type,
-                        position=put.position,
-                        strike=put.strike,
-                        expiry=put.expiry,
-                        tag=tag_name,
-                        coverage_percent=0.0
-                    )
-                )
-                processed_option_ids.add(call.isin)
-                processed_option_ids.add(put.isin)
+            strangle_results = _identify_strangles(options_list_for_expiry, processed_option_ids)
+            results.extend(strangle_results)
 
     # 3. Identify Spreads (Vertical) - Simplified
     # Looks for two options of the *same type* and *same expiry*, but *different strikes* and *opposite positions*.
