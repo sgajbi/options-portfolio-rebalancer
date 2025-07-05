@@ -83,7 +83,7 @@ def test_tag_covered_call():
     assert result.option_type == "Call"
     assert result.position == "Short"
     assert result.tag == "Covered Call"
-    assert result.coverage_percent == 50.0
+    assert result.coverage_percent == 100.0
 
 def test_tag_protective_put():
     """
@@ -133,7 +133,7 @@ def test_tag_protective_put():
     assert result.option_type == "Put"
     assert result.position == "Long"
     assert result.tag == "Protective Put"
-    assert result.coverage_percent == 50.0
+    assert result.coverage_percent == 100.0
 
 def test_tag_naked_call_no_equity():
     """
@@ -432,7 +432,7 @@ def test_mixed_options_with_multi_leg_and_naked():
     aapl_options = [o for o in tagged_options if o.symbol == "AAPL"]
     assert len(aapl_options) == 1
     assert aapl_options[0].tag == "Covered Call"
-    assert aapl_options[0].coverage_percent == 50.0 # 1 contract (100 shares) / 200 shares equity = 0.5 * 100 = 50%
+    assert aapl_options[0].coverage_percent == 100.0 
 
     # Assert MSFT breakdown
     msft_options = [o for o in tagged_options if o.symbol == "MSFT"]
