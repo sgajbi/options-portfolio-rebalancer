@@ -5,7 +5,6 @@ from ..models.equity_position import EquityPosition
 from ..models.options import TaggedOptionPosition
 from ..models.option_position import OptionPosition
 
-
 OPTION_MULTIPLIER = 100
 
 def _identify_straddles(
@@ -171,6 +170,57 @@ def _identify_vertical_spreads(
     
     return results
 
+def _process_single_leg_options(
+    all_options_list: List[OptionPosition],
+    processed_option_ids: set,
+    equity_map: Dict[str, int]
+) -> List[TaggedOptionPosition]:
+    """
+    Processes single-leg option positions, tagging them as Covered Call, Protective Put, or Naked.
+    """
+    results: List[TaggedOptionPosition] = []
+    for pos in all_options_list: # Iterate through the original flat list of all options
+        if pos.isin in processed_option_ids:
+            continue # Skip options already processed in multi-leg strategies
+
+        symbol = pos.symbol
+        contracts = pos.contracts
+        option_type = pos.option_type
+        position_type = pos.position
+        strike = pos.strike
+        expiry = pos.expiry
+
+        option_exposure_shares = contracts * OPTION_MULTIPLIER
+        equity_held_shares = equity_map.get(symbol, 0)
+
+        tag: str = "Naked" # Default to Naked
+        coverage: float = 0.0
+
+        if option_exposure_shares > 0: # Avoid division by zero
+            if position_type == "Short" and option_type == "Call":
+                coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
+                if coverage > 0: # If there's any coverage, it's not truly naked
+                    tag = "Covered Call"
+            elif position_type == "Long" and option_type == "Put":
+                coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
+                if coverage > 0: # If there's any coverage, it's not truly naked
+                    tag = "Protective Put"
+        
+        results.append(
+            TaggedOptionPosition(
+                symbol=symbol,
+                option_type=option_type,
+                position=position_type,
+                strike=strike,
+                expiry=expiry,
+                tag=tag,
+                coverage_percent=coverage
+            )
+        )
+
+    return results
+
+
 def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     """
     Analyzes option positions within a portfolio to identify and tag common strategies
@@ -220,44 +270,7 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
             results.extend(spread_results)
     
     # 4. Process remaining single-leg options (Covered Call, Protective Put, Naked)
-    # This loop now only processes options that haven't been identified as part of a multi-leg strategy.
-    for pos in all_options_list: # Iterate through the original flat list of all options
-        if pos.isin in processed_option_ids:
-            continue # Skip options already processed in multi-leg strategies
-
-        symbol = pos.symbol
-        contracts = pos.contracts
-        option_type = pos.option_type
-        position_type = pos.position
-        strike = pos.strike
-        expiry = pos.expiry
-
-        option_exposure_shares = contracts * OPTION_MULTIPLIER
-        equity_held_shares = equity_map.get(symbol, 0)
-
-        tag: str = "Naked" # Default to Naked
-        coverage: float = 0.0
-
-        if option_exposure_shares > 0: # Avoid division by zero
-            if position_type == "Short" and option_type == "Call":
-                coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
-                if coverage > 0: # If there's any coverage, it's not truly naked
-                    tag = "Covered Call"
-            elif position_type == "Long" and option_type == "Put":
-                coverage = min(100.0, round((equity_held_shares / option_exposure_shares) * 100, 2))
-                if coverage > 0: # If there's any coverage, it's not truly naked
-                    tag = "Protective Put"
-        
-        results.append(
-            TaggedOptionPosition(
-                symbol=symbol,
-                option_type=option_type,
-                position=position_type,
-                strike=strike,
-                expiry=expiry,
-                tag=tag,
-                coverage_percent=coverage
-            )
-        )
+    single_leg_results = _process_single_leg_options(all_options_list, processed_option_ids, equity_map)
+    results.extend(single_leg_results)
 
     return results
