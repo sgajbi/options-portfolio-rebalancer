@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from collections import defaultdict
 from ..models.portfolio import Portfolio
 from ..models.equity_position import EquityPosition
@@ -6,6 +6,58 @@ from ..models.options import TaggedOptionPosition
 from ..models.option_position import OptionPosition
 
 OPTION_MULTIPLIER = 100
+
+def _identify_straddles(
+    options_list: List[OptionPosition], 
+    processed_option_ids: set
+) -> List[TaggedOptionPosition]:
+    """
+    Identifies Straddle strategies within a list of options.
+    A straddle involves buying/selling both a call and a put with the same strike and expiry on the same underlying.
+    """
+    results: List[TaggedOptionPosition] = []
+    
+    calls = [op for op in options_list if op.option_type == "Call" and op.isin not in processed_option_ids]
+    puts = [op for op in options_list if op.option_type == "Put" and op.isin not in processed_option_ids]
+    
+    calls.sort(key=lambda x: x.strike)
+    puts.sort(key=lambda x: x.strike)
+
+    matched_straddles = []
+    for call in calls:
+        for put in puts:
+            if call.strike == put.strike and call.position == put.position:
+                if call.isin not in processed_option_ids and put.isin not in processed_option_ids:
+                    matched_straddles.append((call, put))
+    
+    for call, put in matched_straddles:
+        tag_name = f"{call.position} Straddle"
+        results.append(
+            TaggedOptionPosition(
+                symbol=call.symbol,
+                option_type=call.option_type,
+                position=call.position,
+                strike=call.strike,
+                expiry=call.expiry,
+                tag=tag_name,
+                coverage_percent=0.0
+            )
+        )
+        results.append(
+            TaggedOptionPosition(
+                symbol=put.symbol,
+                option_type=put.option_type,
+                position=put.position,
+                strike=put.strike,
+                expiry=put.expiry,
+                tag=tag_name,
+                coverage_percent=0.0
+            )
+        )
+        processed_option_ids.add(call.isin)
+        processed_option_ids.add(put.isin)
+            
+    return results
 
 
 def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
@@ -39,52 +91,10 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     # --- Strategy Identification Logic ---
 
     # 1. Identify Straddles (Long or Short)
-    # A straddle involves buying/selling both a call and a put with the same strike and expiry on the same underlying.
     for symbol, expiries in options_by_symbol_expiry.items():
         for expiry, options_list_for_expiry in expiries.items():
-            calls = [op for op in options_list_for_expiry if op.option_type == "Call" and op.isin not in processed_option_ids]
-            puts = [op for op in options_list_for_expiry if op.option_type == "Put" and op.isin not in processed_option_ids]
-            
-
-            # Sort by strike for easier matching
-            calls.sort(key=lambda x: x.strike)
-            puts.sort(key=lambda x: x.strike)
-
-            # Look for exact strike matches
-            matched_straddles = []
-            for call in calls:
-                for put in puts:
-                    if call.strike == put.strike and call.position == put.position:
-                        # Ensure both legs haven't been processed yet
-                        if call.isin not in processed_option_ids and put.isin not in processed_option_ids:
-                            matched_straddles.append((call, put))
-            
-            for call, put in matched_straddles:
-                tag_name = f"{call.position} Straddle"
-                results.append(
-                    TaggedOptionPosition(
-                        symbol=call.symbol,
-                        option_type=call.option_type,
-                        position=call.position,
-                        strike=call.strike,
-                        expiry=call.expiry,
-                        tag=tag_name,
-                        coverage_percent=0.0 # Straddles typically have no equity coverage
-                    )
-                )
-                results.append(
-                    TaggedOptionPosition(
-                        symbol=put.symbol,
-                        option_type=put.option_type,
-                        position=put.position,
-                        strike=put.strike,
-                        expiry=put.expiry,
-                        tag=tag_name,
-                        coverage_percent=0.0
-                    )
-                )
-                processed_option_ids.add(call.isin)
-                processed_option_ids.add(put.isin)
+            straddle_results = _identify_straddles(options_list_for_expiry, processed_option_ids)
+            results.extend(straddle_results)
 
     # 2. Identify Strangles (Long or Short)
     # A strangle involves buying/selling both a call and a put with different strikes but same expiry on the same underlying.
