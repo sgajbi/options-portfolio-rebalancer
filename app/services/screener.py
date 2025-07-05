@@ -5,7 +5,7 @@ from ..models.equity_position import EquityPosition
 from ..models.options import TaggedOptionPosition
 from ..models.option_position import OptionPosition
 
-# Define a constant for the option multiplier to improve readability
+
 OPTION_MULTIPLIER = 100
 
 def _identify_straddles(
@@ -116,6 +116,60 @@ def _identify_strangles(
 
     return results
 
+def _identify_vertical_spreads(
+    options_list: List[OptionPosition],
+    processed_option_ids: set
+) -> List[TaggedOptionPosition]:
+    """
+    Identifies Vertical Spread strategies within a list of options.
+    Looks for two options of the same type and same expiry, but different strikes and opposite positions.
+    """
+    results: List[TaggedOptionPosition] = []
+
+    remaining_options_for_spread = [op for op in options_list if op.isin not in processed_option_ids]
+    remaining_options_for_spread.sort(key=lambda x: x.strike)
+
+    matched_spreads = []
+    for i in range(len(remaining_options_for_spread)):
+        for j in range(i + 1, len(remaining_options_for_spread)):
+            option1 = remaining_options_for_spread[i]
+            option2 = remaining_options_for_spread[j]
+
+            if option1.option_type == option2.option_type:
+                if (option1.position == "Long" and option2.position == "Short") or \
+                   (option1.position == "Short" and option2.position == "Long"):
+                    
+                    if option1.isin not in processed_option_ids and option2.isin not in processed_option_ids:
+                        matched_spreads.append((option1, option2))
+            
+    for option1, option2 in matched_spreads:
+        tag_name = f"{option1.option_type} Vertical Spread" # Simplified naming
+        results.append(
+            TaggedOptionPosition(
+                symbol=option1.symbol,
+                option_type=option1.option_type,
+                position=option1.position,
+                strike=option1.strike,
+                expiry=option1.expiry,
+                tag=tag_name,
+                coverage_percent=0.0
+            )
+        )
+        results.append(
+            TaggedOptionPosition(
+                symbol=option2.symbol,
+                option_type=option2.option_type,
+                position=option2.position,
+                strike=option2.strike,
+                expiry=option2.expiry,
+                tag=tag_name,
+                coverage_percent=0.0
+            )
+        )
+        processed_option_ids.add(option1.isin)
+        processed_option_ids.add(option2.isin)
+    
+    return results
 
 def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
     """
@@ -160,57 +214,10 @@ def tag_option_strategies(portfolio: Portfolio) -> List[TaggedOptionPosition]:
             results.extend(strangle_results)
 
     # 3. Identify Spreads (Vertical) - Simplified
-    # Looks for two options of the *same type* and *same expiry*, but *different strikes* and *opposite positions*.
     for symbol, expiries in options_by_symbol_expiry.items():
         for expiry, options_list_for_expiry in expiries.items():
-            # Filter options not yet processed
-            remaining_options_for_spread = [op for op in options_list_for_expiry if op.isin not in processed_option_ids]
-            
-            # Sort by strike
-            remaining_options_for_spread.sort(key=lambda x: x.strike)
-
-            matched_spreads = []
-            for i in range(len(remaining_options_for_spread)):
-                for j in range(i + 1, len(remaining_options_for_spread)):
-                    option1 = remaining_options_for_spread[i]
-                    option2 = remaining_options_for_spread[j]
-
-                    # Check if they are of the same type (Call/Call or Put/Put)
-                    if option1.option_type == option2.option_type:
-                        # Check if they have opposite positions (Long/Short)
-                        if (option1.position == "Long" and option2.position == "Short") or \
-                           (option1.position == "Short" and option2.position == "Long"):
-                            
-                            # Check if both haven't been processed
-                            if option1.isin not in processed_option_ids and option2.isin not in processed_option_ids:
-                                matched_spreads.append((option1, option2))
-            
-            for option1, option2 in matched_spreads:
-                tag_name = f"{option1.option_type} Vertical Spread" # Simplified naming
-                results.append(
-                    TaggedOptionPosition(
-                        symbol=option1.symbol,
-                        option_type=option1.option_type,
-                        position=option1.position,
-                        strike=option1.strike,
-                        expiry=option1.expiry,
-                        tag=tag_name,
-                        coverage_percent=0.0
-                    )
-                )
-                results.append(
-                    TaggedOptionPosition(
-                        symbol=option2.symbol,
-                        option_type=option2.option_type,
-                        position=option2.position,
-                        strike=option2.strike,
-                        expiry=option2.expiry,
-                        tag=tag_name,
-                        coverage_percent=0.0
-                    )
-                )
-                processed_option_ids.add(option1.isin)
-                processed_option_ids.add(option2.isin)
+            spread_results = _identify_vertical_spreads(options_list_for_expiry, processed_option_ids)
+            results.extend(spread_results)
     
     # 4. Process remaining single-leg options (Covered Call, Protective Put, Naked)
     # This loop now only processes options that haven't been identified as part of a multi-leg strategy.
