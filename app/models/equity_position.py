@@ -4,6 +4,9 @@ from .currency import ISOCurrency
 
 
 class EquityPosition(BaseModel):
+    """
+    Represents an equity (stock) holding in a portfolio.
+    """
     type: Literal["Equity"] = Field(json_schema_extra={"description": "Instrument type identifier (always 'Equity')."})
     
     symbol: str = Field(

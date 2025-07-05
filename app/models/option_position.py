@@ -1,9 +1,13 @@
 from pydantic import BaseModel, Field
-from typing import List, Literal, Union, Annotated
+from typing import Literal
+from datetime import date
 from .currency import ISOCurrency
 
 
 class OptionPosition(BaseModel):
+    """
+    Represents an option contract position.
+    """
     type: Literal["Option"] = Field(
         json_schema_extra={"description": "Discriminator for union types. Fixed value: 'Option'."}
     )
@@ -27,7 +31,7 @@ class OptionPosition(BaseModel):
         ge=0
     )
 
-    expiry: str = Field(
+    expiry: date = Field(
         json_schema_extra={
             "description": "Expiration date of the option (ISO 8601 format).",
             "example": "2025-12-19"
@@ -76,10 +80,10 @@ class OptionPosition(BaseModel):
             "example": "US0378331005"
         }
     )
-
+    
     instrument_currency: ISOCurrency = Field(
         json_schema_extra={
-            "description": "Currency in which the option is denominated.",
+            "description": "Currency in which the option is denominated/traded.",
             "example": "USD"
         }
     )

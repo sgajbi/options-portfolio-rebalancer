@@ -1,9 +1,13 @@
 from pydantic import BaseModel, Field
-from typing import List, Literal, Union, Annotated
+from typing import Literal
+from datetime import date 
 from .currency import ISOCurrency
 
-  
+
 class FXSwapPosition(BaseModel):
+    """
+    Represents a Foreign Exchange (FX) Swap contract position.
+    """
     type: Literal["FXSwap"] = Field(
         json_schema_extra={"description": "Instrument type discriminator, fixed as 'FXSwap'."}
     )
@@ -32,19 +36,19 @@ class FXSwapPosition(BaseModel):
             "example": "Buy"
         }
     )
-    trade_date: str = Field(
+    trade_date: date = Field( 
         json_schema_extra={
             "description": "Date trade was executed (ISO format).",
             "example": "2025-07-01"
         }
     )
-    near_leg_settlement_date: str = Field(
+    near_leg_settlement_date: date = Field( 
         json_schema_extra={
             "description": "Settlement date for the near leg (spot leg).",
             "example": "2025-07-03"
         }
     )
-    far_leg_settlement_date: str = Field(
+    far_leg_settlement_date: date = Field( 
         json_schema_extra={
             "description": "Settlement date for the far leg (forward leg).",
             "example": "2025-08-01"
@@ -70,15 +74,9 @@ class FXSwapPosition(BaseModel):
             "example": 10_000.0
         }
     )
-    valuation_date: str = Field(
+    valuation_date: date = Field( 
         json_schema_extra={
-            "description": "Date when MTM valuation is performed (ISO format).",
-            "example": "2025-07-04"
-        }
-    )
-    instrument_currency: ISOCurrency = Field(
-        json_schema_extra={
-            "description": "Currency in which market_value is expressed, usually quote currency.",
-            "example": "USD"
+            "description": "Date as of which the market value is calculated.",
+            "example": "2025-07-01"
         }
     )

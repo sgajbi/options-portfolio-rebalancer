@@ -1,5 +1,5 @@
 import pytest
-from app.models.portfolio import Portfolio 
+from app.models.portfolio import Portfolio
 from app.models.option_position import OptionPosition
 from app.models.equity_position import EquityPosition
 from app.services.screener import tag_option_strategies
@@ -8,11 +8,11 @@ from datetime import datetime, timedelta
 
 
 def create_option(
-    symbol: str, 
-    option_type: str, 
-    position: str, 
-    strike: float, 
-    expiry: str, 
+    symbol: str,
+    option_type: str,
+    position: str,
+    strike: float,
+    expiry: str,
     contracts: int = 1,
     isin: str = None
 ) -> OptionPosition:
@@ -72,7 +72,7 @@ def test_tag_covered_call():
             }
         ]
     }
-    
+
     portfolio = Portfolio(**portfolio_data)
     results = tag_option_strategies(portfolio)
 
@@ -122,7 +122,7 @@ def test_tag_protective_put():
             }
         ]
     }
-    
+
     portfolio = Portfolio(**portfolio_data)
     results = tag_option_strategies(portfolio)
 
@@ -162,7 +162,7 @@ def test_tag_naked_call_no_equity():
             }
         ]
     }
-    
+
     portfolio = Portfolio(**portfolio_data)
     results = tag_option_strategies(portfolio)
 
@@ -194,7 +194,7 @@ def test_tag_naked_put_no_equity():
                 "strike": 140.0,
                 "expiry": "2025-10-17",
                 "position": "Short", # A naked short put (selling puts without cash/securities for obligation)
-                "contracts": 1, 
+                "contracts": 1,
                 "price_at_purchase": 5.0,
                 "current_price": 6.0,
                 "market_value": 600.0,
@@ -203,7 +203,7 @@ def test_tag_naked_put_no_equity():
             }
         ]
     }
-    
+
     portfolio = Portfolio(**portfolio_data)
     results = tag_option_strategies(portfolio)
 
@@ -220,7 +220,7 @@ def test_tag_naked_put_no_equity():
 def test_long_straddle_identification():
     """Tests correct identification of a Long Straddle (Long Call + Long Put, same strike, same expiry)."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     portfolio = Portfolio(
         portfolio_id="test_straddle",
         portfolio_currency="USD",
@@ -232,19 +232,20 @@ def test_long_straddle_identification():
             create_option("SPY", "Put", "Long", 400.0, test_expiry, isin="SPY-LP-400"),
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
-    
+
     # Sort for consistent assertion order
     tagged_options.sort(key=lambda x: (x.symbol, x.option_type, x.strike, x.expiry))
 
     assert len(tagged_options) == 2
-    
+
     assert tagged_options[0].symbol == "SPY"
     assert tagged_options[0].option_type == "Call"
     assert tagged_options[0].position == "Long"
     assert tagged_options[0].strike == 400.0
-    assert tagged_options[0].expiry == test_expiry
+    # FIX: Convert expiry to string for comparison
+    assert tagged_options[0].expiry.strftime("%Y-%m-%d") == test_expiry
     assert tagged_options[0].tag == "Long Straddle"
     assert tagged_options[0].coverage_percent == 0.0
 
@@ -252,14 +253,15 @@ def test_long_straddle_identification():
     assert tagged_options[1].option_type == "Put"
     assert tagged_options[1].position == "Long"
     assert tagged_options[1].strike == 400.0
-    assert tagged_options[1].expiry == test_expiry
+    # FIX: Convert expiry to string for comparison
+    assert tagged_options[1].expiry.strftime("%Y-%m-%d") == test_expiry
     assert tagged_options[1].tag == "Long Straddle"
     assert tagged_options[1].coverage_percent == 0.0
 
 def test_short_straddle_identification():
     """Tests correct identification of a Short Straddle (Short Call + Short Put, same strike, same expiry)."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     portfolio = Portfolio(
         portfolio_id="test_short_straddle",
         portfolio_currency="USD",
@@ -271,7 +273,7 @@ def test_short_straddle_identification():
             create_option("SPY", "Put", "Short", 400.0, test_expiry, isin="SPY-SP-400"),
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
     tagged_options.sort(key=lambda x: (x.symbol, x.option_type, x.strike, x.expiry))
 
@@ -283,7 +285,7 @@ def test_short_straddle_identification():
 def test_long_strangle_identification():
     """Tests correct identification of a Long Strangle (Long Call + Long Put, different strikes, same expiry)."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     portfolio = Portfolio(
         portfolio_id="test_strangle",
         portfolio_currency="USD",
@@ -295,7 +297,7 @@ def test_long_strangle_identification():
             create_option("QQQ", "Put", "Long", 370.0, test_expiry, isin="QQQ-LP-370"), # Lower strike Put
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
     tagged_options.sort(key=lambda x: (x.symbol, x.option_type, x.strike, x.expiry))
 
@@ -308,7 +310,7 @@ def test_long_strangle_identification():
 def test_short_strangle_identification():
     """Tests correct identification of a Short Strangle (Short Call + Short Put, different strikes, same expiry)."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     portfolio = Portfolio(
         portfolio_id="test_short_strangle",
         portfolio_currency="USD",
@@ -320,7 +322,7 @@ def test_short_strangle_identification():
             create_option("QQQ", "Put", "Short", 370.0, test_expiry, isin="QQQ-SP-370"),
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
     tagged_options.sort(key=lambda x: (x.symbol, x.option_type, x.strike, x.expiry))
 
@@ -332,7 +334,7 @@ def test_short_strangle_identification():
 def test_call_vertical_spread_identification():
     """Tests correct identification of a Call Vertical Spread (e.g., Bull Call Spread: Long Call Lower Strike + Short Call Higher Strike)."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     portfolio = Portfolio(
         portfolio_id="test_call_spread",
         portfolio_currency="USD",
@@ -344,7 +346,7 @@ def test_call_vertical_spread_identification():
             create_option("MSFT", "Call", "Short", 460.0, test_expiry, isin="MSFT-SC-460"), # Sell higher strike call
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
     tagged_options.sort(key=lambda x: (x.symbol, x.option_type, x.strike, x.expiry))
 
@@ -356,7 +358,7 @@ def test_call_vertical_spread_identification():
 def test_put_vertical_spread_identification():
     """Tests correct identification of a Put Vertical Spread (e.g., Bear Put Spread: Long Put Higher Strike + Short Put Lower Strike)."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     portfolio = Portfolio(
         portfolio_id="test_put_spread",
         portfolio_currency="USD",
@@ -368,7 +370,7 @@ def test_put_vertical_spread_identification():
             create_option("GOOG", "Put", "Short", 170.0, test_expiry, isin="GOOG-SP-170"), # Sell lower strike put
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
     tagged_options.sort(key=lambda x: (x.symbol, x.option_type, x.strike, x.expiry))
 
@@ -406,8 +408,8 @@ def test_mixed_options_with_multi_leg_and_naked():
             create_option("SPY", "Put", "Long", 400.0, test_expiry_spy, isin="SPY-LP-400-mixed"),
             # Covered Call on AAPL (1 contract covered by 200 shares)
             create_option("AAPL", "Call", "Short", 180.0, test_expiry_aapl, isin="AAPL-SC-180-mixed"),
-            
-            # Options for MSFT: 
+
+            # Options for MSFT:
             # 1. Short Put 440 (will form Short Strangle with Short Call 460)
             # 2. Long Call 450 (will be Naked)
             # 3. Short Call 460 (will form Short Strangle with Short Put 440)
@@ -432,12 +434,12 @@ def test_mixed_options_with_multi_leg_and_naked():
     aapl_options = [o for o in tagged_options if o.symbol == "AAPL"]
     assert len(aapl_options) == 1
     assert aapl_options[0].tag == "Covered Call"
-    assert aapl_options[0].coverage_percent == 100.0 
+    assert aapl_options[0].coverage_percent == 100.0
 
     # Assert MSFT breakdown
     msft_options = [o for o in tagged_options if o.symbol == "MSFT"]
     assert len(msft_options) == 3
-    
+
     # Expected: One Short Strangle (2 options) and one Naked (1 option)
     short_strangle_options = [o for o in msft_options if o.tag == "Short Strangle"]
     naked_options = [o for o in msft_options if o.tag == "Naked"]
@@ -449,7 +451,7 @@ def test_mixed_options_with_multi_leg_and_naked():
     # The Short Put 440 and Short Call 460 form the Short Strangle
     strangle_put = next((o for o in short_strangle_options if o.option_type == "Put" and o.strike == 440.0), None)
     strangle_call = next((o for o in short_strangle_options if o.option_type == "Call" and o.strike == 460.0), None)
-    
+
     assert strangle_put is not None
     assert strangle_call is not None
 
@@ -463,11 +465,11 @@ def test_mixed_options_with_multi_leg_and_naked():
 def test_option_not_tagged_if_processed_elsewhere():
     """Ensures an option is only tagged once even if it matches multiple simple rules."""
     test_expiry = (datetime.now() + timedelta(days=90)).strftime("%Y-%m-%d")
-    
+
     # This scenario is specifically for Straddles/Strangles/Spreads logic,
     # where an option might *look* naked if considered alone, but is part of a multi-leg.
     # The `processed_option_ids` set handles this.
-    
+
     portfolio = Portfolio(
         portfolio_id="test_deduplication",
         portfolio_currency="USD",
@@ -479,7 +481,7 @@ def test_option_not_tagged_if_processed_elsewhere():
             create_option("XYZ", "Put", "Long", 50.0, test_expiry, isin="XYZ-LP-50"),
         ],
     )
-    
+
     tagged_options = tag_option_strategies(portfolio)
     assert len(tagged_options) == 2
     assert all(o.tag == "Long Straddle" for o in tagged_options)

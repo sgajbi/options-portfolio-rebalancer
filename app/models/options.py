@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Literal
+from datetime import date 
+
 
 class TaggedOptionPosition(BaseModel):
     """
@@ -9,7 +11,7 @@ class TaggedOptionPosition(BaseModel):
     option_type: Literal["Call", "Put"] = Field(json_schema_extra={"description": "Type of the option: Call or Put."})
     position: Literal["Long", "Short"] = Field(json_schema_extra={"description": "Position type: Long (buyer) or Short (writer)."})
     strike: float = Field(json_schema_extra={"description": "Strike price of the option."})
-    expiry: str = Field(json_schema_extra={"description": "Expiration date of the option in ISO format (YYYY-MM-DD)."})
+    expiry: date = Field(json_schema_extra={"description": "Expiration date of the option in ISO format (YYYY-MM-DD)."}) # Changed to date
     tag: Literal[
         "Naked", 
         "Covered Call", 

@@ -1,9 +1,13 @@
 from pydantic import BaseModel, Field
-from typing import List, Literal, Union, Annotated
+from typing import Literal
+from datetime import date
 from .currency import ISOCurrency
 
- 
+
 class FXSpotPosition(BaseModel):
+    """
+    Represents an FX Spot (Foreign Exchange Spot) trade position.
+    """
     type: Literal["FXSpot"] = Field(
         json_schema_extra={"description": "Discriminator to identify instrument type. Fixed value: 'FXSpot'."}
     )
@@ -34,14 +38,14 @@ class FXSpotPosition(BaseModel):
         json_schema_extra={"description": "Direction of the trade from the client's perspective: Buy (buy base currency) or Sell (sell base currency)."}
     )
 
-    trade_date: str = Field(
+    trade_date: date = Field( 
         json_schema_extra={
             "description": "Date on which the FX trade was booked (ISO format).",
             "example": "2025-07-01"
         }
     )
 
-    settlement_date: str = Field(
+    settlement_date: date = Field( 
         json_schema_extra={
             "description": "Date when the FX trade is settled, typically T+2.",
             "example": "2025-07-03"
@@ -64,16 +68,9 @@ class FXSpotPosition(BaseModel):
         ge=0
     )
 
-    valuation_date: str = Field(
+    valuation_date: date = Field( 
         json_schema_extra={
-            "description": "Date as of which the market value is calculated.",
-            "example": "2025-07-04"
-        }
-    )
-
-    instrument_currency: ISOCurrency = Field(
-        json_schema_extra={
-            "description": "Currency in which the instrument is valued (typically same as quote currency).",
-            "example": "USD"
+            "description": "Date as of which the market value is calculated (ISO format).",
+            "example": "2025-07-01"
         }
     )

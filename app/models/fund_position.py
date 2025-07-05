@@ -1,9 +1,12 @@
 from pydantic import BaseModel, Field
-from typing import List, Literal, Union, Annotated
-from .currency import ISOCurrency
+from typing import Literal
+from .currency import ISOCurrency 
 
 
 class FundPosition(BaseModel):
+    """
+    Represents a holding in a mutual fund, ETF, or hedge fund.
+    """
     type: Literal["Fund"] = Field(
         json_schema_extra={"description": "Instrument type discriminator; fixed value 'Fund'."}
     )
@@ -43,6 +46,12 @@ class FundPosition(BaseModel):
         },
         ge=0
     )
+    instrument_currency: ISOCurrency = Field( 
+        json_schema_extra={
+            "description": "Currency in which the fund is denominated.",
+            "example": "USD"
+        }
+    )
     market_value: float = Field(
         json_schema_extra={
             "description": "Current market value, calculated as quantity × current price.",
@@ -53,13 +62,6 @@ class FundPosition(BaseModel):
     isin: str = Field(
         json_schema_extra={
             "description": "International Securities Identification Number of the fund.",
-            "example": "IE00B6R51Z18"
+            "example": "IE00B0M62Q58"
         }
     )
-    instrument_currency: ISOCurrency = Field(
-        json_schema_extra={
-            "description": "Currency in which the fund is denominated.",
-            "example": "USD"
-        }
-    )
-

@@ -4,6 +4,9 @@ from .currency import ISOCurrency
 
 
 class BondPosition(BaseModel):
+    """
+    Represents a bond holding in a portfolio.
+    """
     type: Literal["Bond"] = Field(
         json_schema_extra={"description": "Instrument type identifier (always 'Bond')."}
     )
