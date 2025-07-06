@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import List, Literal, Optional, Union # <--- Add Union here
+from typing import List, Literal
 from datetime import date
-from .option_position import OptionPosition
+from .option_position import OptionPosition  
 
 class OptionStrategy(BaseModel):
     """
@@ -30,18 +30,4 @@ class OptionStrategy(BaseModel):
     )
     net_premium_paid_received: float = Field(
         json_schema_extra={"description": "Net premium paid (positive) or received (negative) for the entire strategy."}
-    )
-    max_profit: Union[float, Literal["Unlimited"]] = Field( 
-        ..., #
-        json_schema_extra={"description": "Maximum potential profit for the strategy. Can be 'Unlimited'."}
-    )
-    max_loss: Union[float, Literal["Unlimited"]] = Field( 
-        ..., 
-        json_schema_extra={"description": "Maximum potential loss for the strategy. Can be 'Unlimited'."}
-    )
-    upper_breakeven_point: Optional[float] = Field(
-        None, json_schema_extra={"description": "Upper breakeven point of the strategy, if applicable."}
-    )
-    lower_breakeven_point: Optional[float] = Field(
-        None, json_schema_extra={"description": "Lower breakeven point of the strategy, if applicable."}
     )
